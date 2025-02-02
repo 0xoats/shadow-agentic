@@ -21,7 +21,8 @@ class XAgent:
           - sentiment_analysis: The analysis provided by the LLM.
           - raw_data: The raw (simulated) data.
         """
-        # Simulate retrieval of raw social data. TODO: Integrate with actual social data.
+        # TODO: Integrate with actual social data, and find a way to index and retrieve tweets
+        # TODO: How to find the tweets of interest?
         raw_data = {
             "token": token_symbol,
             "tweets": [
