@@ -12,32 +12,41 @@ class InsightsAgent:
 
     def consolidate(self, sentiment: dict, technical: dict, wallet: dict) -> dict:
         """
-        Consolidate analysis outputs from the sentiment, technical, and wallet agents to generate
-        a final recommendation.
-        Returns a dictionary with:
-          - consolidated_insights: The final recommendation analysis.
-          - details: All individual agent outputs.
+        Consolidate analysis outputs from the sentiment, technical, and wallet agents
+        to generate a final comprehensive trading recommendation.
+        
+        Returns a dictionary containing:
+          - consolidated_insights: The final recommendation provided by the model.
+          - details: The individual outputs from the sentiment, technical, and wallet agents.
         """
-        # Prepare a prompt that includes the outputs from the other agents.
+        # Construct a detailed prompt that clearly lays out each analysis section.
         prompt = (
-            "Below are the analysis results from different agents for a given token and wallet:\n\n"
-            "1. Sentiment Analysis (from XAgent):\n"
+            "You are a seasoned crypto market analyst. Your task is to synthesize the following analysis results "
+            "from three specialized agents into a single, coherent final trading recommendation. Consider the overall "
+            "market sentiment, technical trends, and the wallet's trading behavior, and provide your recommendation with "
+            "insights regarding risk, potential future performance, and any actionable strategies.\n\n"
+            "----- Sentiment Analysis (from XAgent) -----\n"
             f"{json.dumps(sentiment, indent=2)}\n\n"
-            "2. Technical Analysis (from DexscreenerAgent):\n"
+            "----- Technical Analysis (from DexscreenerAgent) -----\n"
             f"{json.dumps(technical, indent=2)}\n\n"
-            "3. Wallet Analysis (from WalletAgent):\n"
+            "----- Wallet Analysis (from WalletAgent) -----\n"
             f"{json.dumps(wallet, indent=2)}\n\n"
-            "Based on the above information, provide a consolidated recommendation for trading, including "
-            "any insights into the token's potential future performance and suggested optimizations."
+            "Based on the above information, please provide a consolidated trading recommendation that includes:\n"
+            "- A summary of key findings from each analysis.\n"
+            "- An overall market outlook for the token(s) in question.\n"
+            "- Suggested trading strategies or optimizations.\n"
+            "- Any risk factors or considerations."
         )
 
+        # Build the chat history for the LLM.
         chat_history = []
         system_message = SystemMessage(
-            content="You are a seasoned crypto market analyst tasked with consolidating multiple sources of analysis into a coherent final recommendation."
+            content="You are a seasoned crypto market analyst tasked with synthesizing multi-source analysis into a clear trading recommendation."
         )
         chat_history.append(system_message)
         chat_history.append(HumanMessage(content=prompt))
 
+        # Invoke the model with the chat history.
         result = self.model.invoke(chat_history)
         consolidated_insights = result.content
 
