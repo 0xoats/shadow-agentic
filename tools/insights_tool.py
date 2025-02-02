@@ -6,11 +6,11 @@ from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
 load_dotenv()
 
-class InsightsAgent:
+class InsightsTool:
     def __init__(self):
         self.model = ChatOpenAI(model="gpt-4o")
 
-    def consolidate(self, sentiment: dict, technical: dict, wallet: dict) -> dict:
+    def consolidate(self, sentiment: dict, technical: dict, wallet: dict, user_preferences: dict) -> dict:
         """
         Consolidate analysis outputs from the sentiment, technical, and wallet agents
         to generate a final comprehensive trading recommendation.
@@ -23,7 +23,7 @@ class InsightsAgent:
         prompt = (
             "You are a seasoned crypto market analyst. Your task is to synthesize the following analysis results "
             "from three specialized agents into a single, coherent final trading recommendation. Consider the overall "
-            "market sentiment, technical trends, and the wallet's trading behavior, and provide your recommendation with "
+            "market sentiment, technical trends, user's preferences, and the wallet's trading behavior, and provide your recommendation with "
             "insights regarding risk, potential future performance, and any actionable strategies.\n\n"
             "----- Sentiment Analysis (from XAgent) -----\n"
             f"{json.dumps(sentiment, indent=2)}\n\n"
@@ -31,6 +31,8 @@ class InsightsAgent:
             f"{json.dumps(technical, indent=2)}\n\n"
             "----- Wallet Analysis (from WalletAgent) -----\n"
             f"{json.dumps(wallet, indent=2)}\n\n"
+            "----- User Preferences -----\n"
+            f"{json.dumps(user_preferences, indent=2)}\n\n"
             "Based on the above information, please provide a consolidated trading recommendation that includes:\n"
             "- A summary of key findings from each analysis.\n"
             "- An overall market outlook for the token(s) in question.\n"

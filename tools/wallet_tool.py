@@ -7,7 +7,7 @@ from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
 load_dotenv()
 
-class WalletAgent:
+class WalletTool:
     def __init__(self):
         # Create a ChatOpenAI model instance (adjust the model name/version as needed)
         self.model = ChatOpenAI(model="gpt-4o")

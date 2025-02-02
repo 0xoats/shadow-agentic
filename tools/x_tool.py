@@ -8,7 +8,7 @@ load_dotenv()
 
 # Assume X_ENDPOINT and X_API_KEY are defined in your configs/config.py if needed.
 # For this example, we simulate the raw data.
-class XAgent:
+class XTool:
     def __init__(self):
         # Create a ChatOpenAI model instance (adjust the model as needed)
         self.model = ChatOpenAI(model="gpt-4o")

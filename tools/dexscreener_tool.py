@@ -9,7 +9,7 @@ load_dotenv()
 
 from configs.config import DEXS_ENDPOINT
 
-class DexscreenerAgent:
+class DexscreenerTool:
     def __init__(self):
         # Base endpoint for the Dexscreener API (e.g., "https://api.dexscreener.com/latest/dex")
         self.endpoint = DEXS_ENDPOINT
