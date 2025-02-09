@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import the recommendation chain (assumed to have been updated to accept user preferences)
-from chains.rag_recommendation_chain import RecommendationChain
+from chains.rag_recommendation_chain import RAGRecommendationChain
 
 # RabbitMQ connection configuration (set these in your .env file or use defaults)
 RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'localhost')
@@ -57,11 +57,11 @@ def process_message(ch, method, properties, body):
     print(f"Extracted user preferences: {user_preferences}")
 
     # Instantiate the recommendation chain (pipeline) and pass the parameters
-    chain = RecommendationChain()
+    chain = RAGRecommendationChain(wallet_address, user_preferences)
     try:
         print("Invoking pipeline...")
         # Here we assume the generate_recommendations method is updated to accept user_preferences.
-        result = chain.generate_recommendations(wallet_address, user_preferences)
+        result = chain.generate_recommendations()
         print("Pipeline result:")
         print(json.dumps(result, indent=2))
         

@@ -10,53 +10,93 @@ class InsightsTool:
     def __init__(self):
         self.model = ChatOpenAI(model="gpt-4o")
 
-    def consolidate(self, sentiment: dict, technical: dict, wallet: dict, user_preferences: dict) -> dict:
+    def consolidate(
+        self, 
+        sentiment: dict, 
+        technical: dict, 
+        wallet: dict, 
+        user_preferences: str,
+        volume_analysis: dict = None,
+        technical_details: dict = None
+    ) -> dict:
         """
-        Consolidate analysis outputs from the sentiment, technical, and wallet agents
-        to generate a final comprehensive trading recommendation.
+        Consolidate analysis outputs from all tools to generate a comprehensive trading recommendation.
         
-        Returns a dictionary containing:
-          - consolidated_insights: The final recommendation provided by the model.
-          - details: The individual outputs from the sentiment, technical, and wallet agents.
+        Args:
+            sentiment: Output from XTool's sentiment analysis
+            technical: Output from DexscreenerTool's similar tokens analysis
+            wallet: Output from WalletTool's wallet analysis
+            user_preferences: User's trading preferences
+            volume_analysis: Optional output from VolumeAnalysisTool
+            technical_details: Optional output from TechnicalAnalysisTool
+        
+        Returns:
+            dict: Consolidated insights and recommendations
         """
-        # Construct a detailed prompt that clearly lays out each analysis section.
+        print(f"Consolidating insights with wallet: {wallet}")
         prompt = (
-            "You are a seasoned crypto market analyst. Your task is to synthesize the following analysis results "
-            "from three specialized agents into a single, coherent final trading recommendation. Consider the overall "
-            "market sentiment, technical trends, user's preferences, and the wallet's trading behavior, and provide your recommendation with "
-            "insights regarding risk, potential future performance, and any actionable strategies.\n\n"
-            "----- Sentiment Analysis (from XAgent) -----\n"
-            f"{json.dumps(sentiment, indent=2)}\n\n"
-            "----- Technical Analysis (from DexscreenerAgent) -----\n"
-            f"{json.dumps(technical, indent=2)}\n\n"
-            "----- Wallet Analysis (from WalletAgent) -----\n"
+            "You are a seasoned crypto market analyst. Synthesize the following analyses "
+            "into a comprehensive trading recommendation:\n\n"
+            
+            "----- Wallet Analysis -----\n"
             f"{json.dumps(wallet, indent=2)}\n\n"
+            
+            "----- Social Sentiment Analysis -----\n"
+            f"{json.dumps(sentiment, indent=2)}\n\n"
+            
+            "----- Similar Tokens Analysis -----\n"
+            f"{json.dumps(technical, indent=2)}\n\n"
+            
+            f"{'----- Volume Analysis -----\n' if volume_analysis else ''}"
+            f"{json.dumps(volume_analysis, indent=2) if volume_analysis else ''}\n\n"
+            
+            f"{'----- Detailed Technical Analysis -----\n' if technical_details else ''}"
+            f"{json.dumps(technical_details, indent=2) if technical_details else ''}\n\n"
+            
             "----- User Preferences -----\n"
-            f"{json.dumps(user_preferences, indent=2)}\n\n"
-            "Based on the above information, please provide a consolidated trading recommendation that includes:\n"
-            "- A summary of key findings from each analysis.\n"
-            "- An overall market outlook for the token(s) in question.\n"
-            "- Suggested trading strategies or optimizations.\n"
-            "- Any risk factors or considerations."
+            f"{user_preferences}\n\n"
+            
+            "Please provide a detailed recommendation including:\n"
+            "1. Portfolio Analysis:\n"
+            "   - Current portfolio composition\n"
+            "   - Trading patterns and behavior\n"
+            "   - Risk exposure assessment\n\n"
+            "2. Market Context:\n"
+            "   - Social sentiment trends\n"
+            "   - Volume and liquidity analysis\n"
+            "   - Technical indicators and patterns\n\n"
+            "3. Opportunities:\n"
+            "   - Similar tokens with potential\n"
+            "   - Entry/exit points\n"
+            "   - Risk-adjusted recommendations\n\n"
+            "4. Risk Factors:\n"
+            "   - Market risks\n"
+            "   - Technical warnings\n"
+            "   - Liquidity considerations\n\n"
+            "5. Action Items:\n"
+            "   - Specific trading recommendations\n"
+            "   - Portfolio adjustments\n"
+            "   - Risk management strategies"
         )
 
-        # Build the chat history for the LLM.
-        chat_history = []
-        system_message = SystemMessage(
-            content="You are a seasoned crypto market analyst tasked with synthesizing multi-source analysis into a clear trading recommendation."
-        )
-        chat_history.append(system_message)
-        chat_history.append(HumanMessage(content=prompt))
+        chat_history = [
+            SystemMessage(
+                content="You are a professional crypto analyst specializing in portfolio optimization "
+                        "and risk-adjusted trading recommendations."
+            ),
+            HumanMessage(content=prompt)
+        ]
 
-        # Invoke the model with the chat history.
         result = self.model.invoke(chat_history)
-        consolidated_insights = result.content
-
+        
         return {
-            "consolidated_insights": consolidated_insights,
+            "consolidated_insights": result.content,
             "details": {
-                "sentiment": sentiment,
-                "technical": technical,
-                "wallet": wallet
+                "wallet_analysis": wallet,
+                "sentiment_analysis": sentiment,
+                "technical_analysis": technical,
+                "volume_analysis": volume_analysis,
+                "technical_details": technical_details,
+                "user_preferences": user_preferences
             }
         }
