@@ -11,6 +11,26 @@ from utils.retriever import load_vector_store, retrieve_context
 import re
 from jsonpath_ng import parse
 
+class ToolStateManager:
+    def __init__(self):
+        self.state = {}
+        
+    def set_output(self, tool_name: str, output: dict):
+        self.state[tool_name] = output
+        
+    def get_output(self, tool_name: str) -> dict:
+        return self.state.get(tool_name, {})
+    
+    def get_field(self, tool_name: str, field_path: str):
+        """Get a specific field using dot notation (e.g., 'WalletTool.tokens_bought')"""
+        try:
+            data = self.state.get(tool_name, {})
+            for key in field_path.split('.'):
+                data = data[key]
+            return data
+        except (KeyError, TypeError):
+            return None
+
 class RAGRecommendationChain:
     def __init__(self, wallet_address: str, user_preferences: str = ""):
         """
@@ -55,154 +75,50 @@ class RAGRecommendationChain:
       #  self.vector_store = load_vector_store()
         # Initialize an LLM for orchestration decisions.
         self.llm = ChatOpenAI(model="gpt-4o")
+        self.state_manager = ToolStateManager()
         
     def orchestrate(self) -> dict:
-        """
-        Uses the LLM to decide which tools to call and in what order, handling dependencies.
-        """
-        # Build a description of the available tools
-        tool_descriptions = "\n".join(
-            f"{name}: {data['description']}" for name, data in self.tools.items()
-        )
-        
-        # Create an initial context prompt for the LLM
-        initial_prompt = (
-            f"User Input:\n"
-            f"Wallet address: {self.wallet_address}\n"
-            f"User preferences: {self.user_preferences}\n\n"
-            f"Available tools:\n{tool_descriptions}\n\n"
-            "Plan a sequence of tool calls that will produce all necessary data for a trading recommendation. "
-            "Some tools may depend on outputs from previous tools.\n\n"
-            "Output your response in the following format:\n"
-            "```json\n"
-            "[\n"
-            "  {\n"
-            "    \"step\": 1,\n"
-            "    \"tool\": \"ToolName\",\n"
-            "    \"input\": \"<direct_input_or_reference>\",\n"
-            "    \"depends_on\": [],\n"
-            "    \"input_mapping\": {}\n"
-            "  },\n"
-            "  {\n"
-            "    \"step\": 2,\n"
-            "    \"tool\": \"ToolName\",\n"
-            "    \"input\": \"<direct_input_or_reference>\",\n"
-            "    \"depends_on\": [\"step_1\"],\n"
-            "    \"input_mapping\": {\"field\": \"$.step_1.output.specific_field\"}\n"
-            "  }\n"
-            "]\n"
-            "```\n\n"
-            "Where:\n"
-            "- step: Numeric order of execution\n"
-            "- tool: Name of the tool to call\n"
-            "- input: Direct input value or placeholder for mapped input\n"
-            "- depends_on: List of step numbers this step depends on\n"
-            "- input_mapping: JSON path mapping from previous steps' outputs\n\n"
-            "Explanation: <explain your plan>"
-        )
-        
-        messages = [
-            SystemMessage(content="You are an expert orchestrator for crypto trading analysis tools."),
-            HumanMessage(content=initial_prompt)
-        ]
-        
-        # Get the execution plan from LLM
-        plan_response = self.llm.invoke(messages)
-        plan_text = plan_response.content.strip()
-        
+        """Uses the LLM to decide which tools to call and in what order."""
+        # First, execute WalletTool as it's always the starting point
         try:
-            # Extract and parse the JSON plan
-            if "```json" in plan_text:
-                json_part = plan_text.split("```json")[1].split("```")[0].strip()
-            else:
-                json_match = re.search(r'\[\s*{.*}\s*\]', plan_text, re.DOTALL)
-                if not json_match:
-                    raise ValueError("No valid JSON plan found in response")
-                json_part = json_match.group(0)
+            wallet_result = self.tools["WalletTool"]["function"](self.wallet_address)
+            self.state_manager.set_output("WalletTool", wallet_result)
             
-            plan = json.loads(json_part)
-            
-            # Sort plan by step number to ensure correct execution order
-            plan.sort(key=lambda x: x["step"])
-            
-            # Store results of each step
-            step_outputs = {}
-            
-            # Execute each step in order
-            for step in plan:
-                step_num = f"step_{step['step']}"
-                tool_name = step["tool"]
-                
-                if tool_name not in self.tools:
-                    print(f"Warning: Tool {tool_name} not found, skipping step {step['step']}")
-                    continue
-                
-                # Resolve input based on dependencies
-                final_input = step["input"]
-                if step["depends_on"]:
-                    # Create a context of all previous outputs this step depends on
-                    dependency_context = {}
-                    for dep in step["depends_on"]:
-                        dep_step = f"step_{dep}"
-                        if dep_step in step_outputs:
-                            dependency_context[dep_step] = step_outputs[dep_step]
+            # Get tokens bought from wallet analysis
+            tokens_bought = wallet_result.get("tokens_bought", [])
+            if tokens_bought:
+                # For each token found, analyze it
+                for token in tokens_bought[:3]:  # Limit to first 3 tokens
+                    # Get technical analysis
+                    dex_result = self.tools["DexscreenerTool"]["function"](wallet_result)
+                    self.state_manager.set_output("DexscreenerTool", dex_result)
                     
-                    # Apply input mappings using JSONPath
-                    for target_field, source_path in step["input_mapping"].items():
-                        try:
-                        
-                            jsonpath_expr = parse(source_path)
-                            matches = [match.value for match in jsonpath_expr.find(dependency_context)]
-                            if matches:
-                                placeholder = f"${{{target_field}}}"
-                                if placeholder in final_input:
-                                    final_input = final_input.replace(placeholder, str(matches[0]))
-                                else:
-                                    final_input = matches[0]  # Direct value assignment if no placeholder
-                        except Exception as e:
-                            print(f"Error applying input mapping: {e}")
-                            continue
-                
-                print(f"\nExecuting {tool_name} with input: {final_input}")
-                
-                # Execute the tool
-                try:
-                    func = self.tools[tool_name]["function"]
-                    result = func(final_input)
-                    step_outputs[step_num] = result
-                    print(f"Step {step_num} output: {json.dumps(result, indent=2)}")
-                except Exception as e:
-                    print(f"Error executing step {step_num}: {e}")
-                    step_outputs[step_num] = None
+                    # Get sentiment analysis
+                    sentiment_result = self.tools["XTool"]["function"](token)
+                    self.state_manager.set_output("XTool", sentiment_result)
+                    
+                    # Get volume analysis
+                    volume_result = self.tools["VolumeAnalysisTool"]["function"](token)
+                    self.state_manager.set_output("VolumeAnalysisTool", volume_result)
+                    
+                    # Get detailed technical analysis
+                    tech_result = self.tools["TechnicalAnalysisTool"]["function"](token)
+                    self.state_manager.set_output("TechnicalAnalysisTool", tech_result)
             
-            # Prepare inputs for consolidation based on actual tool outputs
+            # Prepare consolidation inputs
             consolidation_inputs = {
-                "user_preferences": self.user_preferences  # This is always available
+                "user_preferences": self.user_preferences,
+                "wallet": self.state_manager.get_output("WalletTool"),
+                "technical": self.state_manager.get_output("DexscreenerTool"),
+                "sentiment": self.state_manager.get_output("XTool"),
+                "volume_analysis": self.state_manager.get_output("VolumeAnalysisTool"),
+                "technical_details": self.state_manager.get_output("TechnicalAnalysisTool")
             }
             
-            # Map tool names to their expected input names in consolidate
-            tool_to_param_mapping = {
-                "XTool": "sentiment",
-                "DexscreenerTool": "technical",
-                "WalletTool": "wallet",
-                "VolumeAnalysisTool": "volume_analysis",
-                "TechnicalAnalysisTool": "technical_details"
-            }
-            
-            # Collect outputs from each step based on the tool used
-            for step in plan:
-                step_num = f"step_{step['step']}"
-                tool_name = step["tool"]
-                
-                if tool_name in tool_to_param_mapping:
-                    param_name = tool_to_param_mapping[tool_name]
-                    consolidation_inputs[param_name] = step_outputs.get(step_num, {})
-            
-            # Generate final recommendation using all gathered data
             return self.insights_tool.consolidate(**consolidation_inputs)
             
         except Exception as e:
-            print(f"Error executing plan: {str(e)}")
+            print(f"Error executing tools: {str(e)}")
             raise
         
     def generate_recommendations(self) -> dict:

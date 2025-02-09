@@ -93,7 +93,6 @@ class XTool:
         }
         """
         print(f"Getting sentiment for token: {token_symbol}")
-        
 
         # 1) Integrate with Farcaster data
         raw_casts = self.search_casts(token_symbol, limit=5)

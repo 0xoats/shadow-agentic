@@ -33,7 +33,6 @@ class InsightsTool:
         Returns:
             dict: Consolidated insights and recommendations
         """
-        print(f"Consolidating insights with wallet: {wallet}")
         prompt = (
             "You are a seasoned crypto market analyst. Synthesize the following analyses "
             "into a comprehensive trading recommendation:\n\n"

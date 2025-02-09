@@ -120,7 +120,6 @@ class DexscreenerTool:
             "tokens_examined": ["TOKEN1", "TOKEN2", ...]
           }
         """
-        print(f"Analyzing similar tokens with wallet: {wallet_insights}")
         tokens_bought = wallet_insights.get("tokens_bought", [])
         # 1) Calculate each token's ratio
         token_ratios = {}
